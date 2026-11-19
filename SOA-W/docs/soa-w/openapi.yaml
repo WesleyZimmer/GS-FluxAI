@@ -1,0 +1,1786 @@
+# Contrato com operações implementadas e planejadas; consulte x-implementation-stage.
+# A presença de uma operação neste arquivo não prova que ela já está implementada.
+openapi: 3.0.3
+info:
+  title: fluxAI API
+  version: 0.1.0
+  description: >-
+    Contrato de integração do fluxAI. A versão da especificação (3.0.3), a
+    versão informativa deste documento (0.1.0) e a versão do caminho da API
+    (/api/v1) são conceitos separados. As operações com
+    x-implementation-stage 2 e 3 estão implementadas; as demais permanecem
+    planejadas. A API usa tokens Bearer locais para separar as funções de
+    operador e worker; isso não substitui OAuth/JWT ou gestão de identidades. Os dados
+    desta demonstração vêm de simulação ou replay identificado e não controlam
+    semáforos de rua.
+  contact:
+    name: Equipe fluxAI
+servers:
+  - url: http://localhost:5169/api/v1
+    description: Perfil HTTP local definido em src/FluxAI.Api/Properties/launchSettings.json.
+tags:
+  - name: Catalog
+    description: Cenários e controladores registrados e permitidos.
+  - name: Configurations
+    description: Revisões de configuração de novas execuções.
+  - name: Runs
+    description: Execuções, resultados importados e métricas.
+  - name: Worker
+    description: Importação existente e operações planejadas do worker Python; claims e callbacks dependem da etapa de orquestração.
+  - name: Citizen
+    description: Operações futuras do app do cidadão; ainda fora do primeiro corte SOA.
+paths:
+  /scenarios:
+    get:
+      tags: [Catalog]
+      operationId: listScenarios
+      summary: Listar cenários disponíveis
+      description: Lista somente cenários registrados no catálogo da API.
+      x-implementation-stage: 2
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: Página de cenários.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /signal-controllers:
+    get:
+      tags: [Catalog]
+      operationId: listSignalControllers
+      summary: Listar controladores de um cenário
+      description: IDs são os IDs semafóricos do catálogo da rede, identificados também pelo scenarioId.
+      x-implementation-stage: 2
+      parameters:
+        - name: scenarioId
+          in: query
+          required: true
+          description: ID estável do cenário cadastrado na API, não um caminho de arquivo.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: fluxia-stage6-c2-8-signals
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: Página de controladores e catálogo das fases.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignalControllerPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /configurations:
+    post:
+      tags: [Configurations]
+      operationId: createConfiguration
+      security:
+        - bearerAuth: []
+      x-required-role: operator
+      summary: Criar configuração de experimento
+      description: >-
+        Cria uma revisão inicial para execuções futuras. A API atribui ID e
+        revisão. A fase e o controlador devem existir no catálogo selecionado.
+        O perfil C2 atual limita o máximo experimental a 90 segundos e mantém
+        amarelo/clearance fixos. A sobrescrita por fase exige suporte explícito
+        no worker Python antes de ser usada numa execução.
+      x-implementation-stage: 2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationWrite'
+            example:
+              name: C2 baseline painel
+              scenarioId: fluxia-stage6-c2-8-signals
+              greenTiming:
+                default:
+                  decisionMinimumSeconds: 10
+                  maximumSeconds: 90
+                phaseOverrides: []
+              blocking:
+                observedCapacityFractionThreshold: 0.95
+                confirmationSamples: 2
+                maximumMeasurementAgeSeconds: 6
+              ppo:
+                totalTimesteps: 4096
+                checkpointEvery: 2048
+                rolloutSteps: 128
+                batchSize: 64
+                epochs: 10
+                learningRate: 0.0003
+                gamma: 0.99
+                gaeLambda: 0.95
+                clipRange: 0.2
+                entropyCoefficient: 0.01
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '201':
+          description: Configuração criada, pronta para novas execuções.
+          headers:
+            Location:
+              description: URI relativa do recurso criado.
+              schema:
+                type: string
+              example: /api/v1/configurations/7cb010d2-8f8f-4f0b-9499-4e3d7157b9a1
+            ETag:
+              $ref: '#/components/headers/ConfigurationETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /configurations/{configurationId}:
+    parameters:
+      - $ref: '#/components/parameters/ConfigurationId'
+    get:
+      tags: [Configurations]
+      operationId: getConfiguration
+      security:
+        - bearerAuth: []
+      x-required-role: operator
+      summary: Consultar configuração e revisão
+      description: GET é somente leitura e devolve a representação completa da revisão atual.
+      x-implementation-stage: 2
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Configuração encontrada.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ConfigurationETag'
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Configurations]
+      operationId: replaceConfiguration
+      security:
+        - bearerAuth: []
+      x-required-role: operator
+      summary: Substituir a configuração editável
+      description: >-
+        PUT recebe a representação editável inteira. If-Match é obrigatório:
+        a revisão é conferida atomicamente com a gravação. A API mantém o
+        histórico usado pelas execuções. O cliente não escolhe o próximo número
+        de revisão nem pode modificar snapshots de TrainingRun.
+      x-implementation-stage: 2
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationWrite'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Configuração substituída; retorna a revisão nova.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ConfigurationETag'
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /runs:
+    get:
+      tags: [Runs]
+      operationId: listRuns
+      security:
+        - bearerAuth: []
+      x-required-role: operator-or-worker
+      summary: Consultar execuções
+      description: Filtros são opcionais e combinados por AND. Ordenação é por criação UTC decrescente.
+      x-implementation-stage: 3
+      parameters:
+        - name: scenarioId
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RunStatus'
+        - name: runType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RunType'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: Página ordenada de execuções.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      tags: [Runs]
+      operationId: requestRun
+      summary: Solicitar execução de treino, avaliação ou diagnóstico
+      description: >-
+        Cria trabalho assíncrono na fila persistida e retorna 202. Não afirma que
+        o processo começou. A repetição de Idempotency-Key com o mesmo ator e o
+        mesmo corpo normalizado devolve a mesma execução; o mesmo valor com corpo
+        diferente resulta em 409. Execuções incompatíveis com a dimensão do
+        catálogo/checkpoint são recusadas antes de entrar na fila. Só cenários e
+        artefatos allowlisted são aceitos.
+      x-implementation-stage: 5
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunRequest'
+      responses:
+        '202':
+          description: Solicitação persistida na fila.
+          headers:
+            Location:
+              description: URI relativa para acompanhar a execução.
+              schema:
+                type: string
+              example: /api/v1/runs/876d6b89-fd53-4b4c-b5f3-2251e75497cf
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              example: 2
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /runs/{runId}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      tags: [Runs]
+      operationId: getRun
+      security:
+        - bearerAuth: []
+      x-required-role: operator-or-worker
+      summary: Consultar estado e proveniência de uma execução
+      description: >-
+        succeeded indica somente que o trabalho terminou tecnicamente; não
+        declara melhora na rede. Use a origem e a cobertura para interpretar as métricas.
+      x-implementation-stage: 3
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Execução e snapshot efetivo.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /runs/{runId}/metrics:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      tags: [Runs]
+      operationId: listRunMetrics
+      security:
+        - bearerAuth: []
+      x-required-role: operator-or-worker
+      summary: Consultar métricas e cobertura de uma execução
+      x-implementation-stage: 3
+      parameters:
+        - name: metricName
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [network, signalController]
+        - name: signalControllerId
+          in: query
+          required: false
+          description: Obrigatório pela regra de domínio quando scope=signalController.
+          schema:
+            type: string
+            maxLength: 100
+        - name: fromSimulationSeconds
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 0
+        - name: toSimulationSeconds
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 0
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Amostras presentes e sua cobertura; métrica ausente não é convertida em zero.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /runs/{runId}/signal-results:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      tags: [Runs]
+      operationId: listSignalResults
+      security:
+        - bearerAuth: []
+      x-required-role: operator-or-worker
+      summary: Consultar indicadores medidos por controlador
+      description: >-
+        A resposta não inventa nota de desempenho. Só inclui indicadores que
+        puderam ser atribuídos ao controlador e informa sua cobertura. A
+        classificação bom/ruim requer limiares validados em etapa posterior.
+      x-implementation-stage: 3
+      parameters:
+        - name: signalControllerId
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Métricas disponíveis por controlador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignalResultPage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /run-imports:
+    post:
+      tags: [Runs, Worker]
+      operationId: importCompletedRun
+      security:
+        - bearerAuth: []
+      x-required-role: worker
+      summary: Importar resumo de uma execução existente
+      description: >-
+        Recebe um resumo normalizado por um adaptador de integração, sem caminhos
+        locais nem instruções de shell. Requer token Bearer de worker configurado fora do repositório.
+        Somente simulação/replay concluídos são
+        aceitos. O adaptador resolve arquivos dentro de diretórios permitidos e
+        confere os hashes antes de formar o payload. A API registra a origem
+        como imported e não a apresenta como treino solicitado por ela.
+        Repetição idêntica de origem/chave é idempotente; dados diferentes
+        associados à mesma identidade são conflito.
+      x-implementation-stage: 3
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunImport'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Importação já persistida; a API devolve a mesma execução sem inserir métricas novamente.
+          headers:
+            Location:
+              schema:
+                type: string
+            Idempotency-Replayed:
+              schema:
+                type: string
+              example: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '201':
+          description: Execução histórica registrada.
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /api/v1/runs/876d6b89-fd53-4b4c-b5f3-2251e75497cf
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /worker/claims:
+    post:
+      tags: [Worker]
+      operationId: claimRun
+      summary: Solicitar atomicamente o próximo trabalho
+      description: >-
+        Chamada exclusiva do worker. A API atribui no máximo uma execução
+        disponível por claim e faz a transição queued para running na mesma
+        transação. Caso não haja trabalho, responde 204 sem corpo. Claim
+        expirado vira interrupted até uma política explícita de retomada decidir
+        o contrário.
+      x-implementation-stage: 5
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Trabalho atribuído ao worker autenticado.
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /api/v1/worker/claims/d8285b7c-3aaa-4c04-9289-8dfd8856c899
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkerClaim'
+        '204':
+          description: Não há trabalho disponível. Sem corpo.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /worker/claims/{claimId}/progress:
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+    put:
+      tags: [Worker]
+      operationId: reportRunProgress
+      summary: Substituir o estado de progresso observado
+      description: >-
+        O servidor verifica identidade e propriedade do claim. Sequência igual
+        com mesmo conteúdo pode ser repetida; sequência antiga ou igual com
+        conteúdo divergente retorna 409. O relógio de chegada é gravado pelo servidor.
+      x-implementation-stage: 5
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunProgress'
+      responses:
+        '200':
+          description: Progresso gravado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /worker/claims/{claimId}/completion:
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+    put:
+      tags: [Worker]
+      operationId: completeRun
+      summary: Registrar resultados verificados e concluir a execução
+      description: >-
+        Conclusão única dentro da transação; repetição idêntica é idempotente.
+        Uma falha do processo usa failure. Concluir tecnicamente não classifica
+        a política como eficaz.
+      x-implementation-stage: 5
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunCompletion'
+      responses:
+        '200':
+          description: Resultado armazenado; execução concluída.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+  /worker/claims/{claimId}/failure:
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
+    put:
+      tags: [Worker]
+      operationId: failRun
+      summary: Registrar falha real do processo
+      description: >-
+        Registra categoria e identificador de log sem devolver stack trace ou
+        segredos. Repetição idêntica é idempotente.
+      x-implementation-stage: 5
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunFailure'
+      responses:
+        '200':
+          description: Falha registrada e execução encerrada como failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /traffic-summary:
+    get:
+      tags: [Citizen]
+      operationId: getTrafficSummary
+      summary: Consultar resumo público de trânsito
+      description: >-
+        Operação prevista para etapa mobile. A representação informa origem,
+        modo e momento de atualização; resultados de replay são identificados
+        e nunca rotulados como trânsito em tempo real.
+      x-implementation-stage: 6
+      security: []
+      parameters:
+        - name: scenarioId
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Resumo agregado do cenário.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /citizen-reports:
+    post:
+      tags: [Citizen]
+      operationId: createCitizenReport
+      summary: Registrar ocorrência de trânsito informada pelo cidadão
+      description: >-
+        Operação prevista para etapa mobile. Receber o relato não muda um
+        semáforo e não o torna dado de treinamento sem validação. A resposta
+        não devolve dados pessoais nem mostra a coordenada exata publicamente.
+      x-implementation-stage: 6
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CitizenReportWrite'
+      responses:
+        '201':
+          description: Ocorrência registrada.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitizenReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/DomainRuleViolation'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: >-
+        Token opaco em HTTP Bearer, validado em tempo constante. No perfil local, configure Authentication__OperatorToken e Authentication__WorkerToken fora do repositório; cada operação declara a função exigida.
+  parameters:
+    ScenarioId:
+      name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    ConfigurationId:
+      name: configurationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ClaimId:
+      name: claimId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      description: Limite padrão 20; máximo 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PageToken:
+      name: pageToken
+      in: query
+      required: false
+      description: Cursor opaco devolvido pela página anterior.
+      schema:
+        type: string
+        maxLength: 512
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Valor opaco escopado ao ator e ligado ao hash do corpo normalizado.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._~-]+$'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: ETag forte retornado pela consulta da configuração.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      example: '"1"'
+  headers:
+    ConfigurationETag:
+      description: Revisão forte; enviar sem alteração em If-Match.
+      schema:
+        type: string
+      example: '"1"'
+  responses:
+    BadRequest:
+      description: JSON, consulta ou cabeçalho malformado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Credencial ausente ou inválida.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Credencial válida sem permissão para esta operação ou recurso.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Recurso não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Estado de domínio, chave idempotente ou sequência em conflito.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: If-Match não corresponde à revisão atual.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DomainRuleViolation:
+      description: JSON bem formado que viola uma regra semântica do fluxAI.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: about:blank
+        title:
+          type: string
+          maxLength: 120
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          maxLength: 1000
+        instance:
+          type: string
+          format: uri-reference
+          description: Caminho da ocorrência, quando preenchido pelo servidor.
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{1,63}$'
+          description: Extensão opcional para códigos estáveis; não emitida pela API atual.
+        errors:
+          type: object
+          description: Mapa de campos para mensagens de validação, no formato retornado por ASP.NET Core.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        traceId:
+          type: string
+          description: Identificador de rastreamento opcional incluído pelo framework.
+    PageInfo:
+      type: object
+      additionalProperties: false
+      required: [pageSize, hasMore]
+      properties:
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        nextPageToken:
+          type: string
+          maxLength: 512
+        hasMore:
+          type: boolean
+    Scenario:
+      type: object
+      additionalProperties: false
+      required: [id, name, revision, networkSha256, catalogSha256, timingProfileId, environment, enabled]
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 200
+        revision:
+          type: string
+          maxLength: 100
+        networkSha256:
+          $ref: '#/components/schemas/Sha256'
+        catalogSha256:
+          $ref: '#/components/schemas/Sha256'
+        timingProfileId:
+          type: string
+          maxLength: 120
+        environment:
+          type: string
+          enum: [simulation]
+        controllerCount:
+          type: integer
+          minimum: 1
+        enabled:
+          type: boolean
+    ScenarioPage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scenario'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    SignalPhase:
+      type: object
+      additionalProperties: false
+      required: [phaseIndex, state, nominalDurationSeconds, isGreen, isAdaptive]
+      properties:
+        phaseIndex:
+          type: integer
+          minimum: 0
+        state:
+          type: string
+          maxLength: 128
+          description: Estado importado do catálogo SUMO.
+        nominalDurationSeconds:
+          type: number
+          minimum: 0
+        isGreen:
+          type: boolean
+        isAdaptive:
+          type: boolean
+    SignalController:
+      type: object
+      additionalProperties: false
+      required: [id, scenarioId, adaptive, phases]
+      properties:
+        id:
+          type: string
+          maxLength: 100
+          example: '457026848'
+        scenarioId:
+          type: string
+          maxLength: 100
+        adaptive:
+          type: boolean
+        phases:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignalPhase'
+    SignalControllerPage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignalController'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    PhaseTimingOverride:
+      type: object
+      additionalProperties: false
+      required: [signalControllerId, phaseIndex]
+      properties:
+        signalControllerId:
+          type: string
+          maxLength: 100
+        phaseIndex:
+          type: integer
+          minimum: 0
+        decisionMinimumSeconds:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 90
+        maximumSeconds:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 90
+    GreenTiming:
+      type: object
+      additionalProperties: false
+      required: [default]
+      properties:
+        default:
+          type: object
+          additionalProperties: false
+          required: [decisionMinimumSeconds, maximumSeconds]
+          properties:
+            decisionMinimumSeconds:
+              type: number
+              minimum: 0
+              exclusiveMinimum: true
+              maximum: 90
+              description: Mínimo para decisão do agente; mínimo efetivo também respeita a duração verde nominal da fase.
+            maximumSeconds:
+              type: number
+              minimum: 0
+              exclusiveMinimum: true
+              maximum: 90
+              description: Teto de verde experimental do perfil C2. Não é parâmetro de campo.
+        phaseOverrides:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/PhaseTimingOverride'
+    BlockingParameters:
+      type: object
+      additionalProperties: false
+      required: [observedCapacityFractionThreshold, confirmationSamples, maximumMeasurementAgeSeconds]
+      properties:
+        observedCapacityFractionThreshold:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+          example: 0.95
+        confirmationSamples:
+          type: integer
+          minimum: 2
+          maximum: 20
+          example: 2
+        maximumMeasurementAgeSeconds:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 60
+          example: 6
+    PpoParameters:
+      type: object
+      additionalProperties: false
+      description: >-
+        Parâmetros conhecidos do treinamento. A API e o worker também validam
+        combinações, recursos disponíveis e compatibilidade do modelo.
+      properties:
+        totalTimesteps:
+          type: integer
+          minimum: 128
+          maximum: 100000
+          default: 4096
+        checkpointEvery:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          default: 2048
+          description: Zero desativa checkpoints intermediários.
+        rolloutSteps:
+          type: integer
+          minimum: 16
+          maximum: 4096
+          default: 128
+        batchSize:
+          type: integer
+          minimum: 8
+          maximum: 4096
+          default: 64
+        epochs:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        learningRate:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 0.1
+          default: 0.0003
+        gamma:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.99
+        gaeLambda:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.95
+        clipRange:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 1
+          default: 0.2
+        entropyCoefficient:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.01
+    EffectiveRunParameters:
+      type: object
+      additionalProperties: false
+      description: >-
+        Valores normalizados pelo adaptador para esta execução. Campos ausentes
+        significam que a fonte não os registrou; não usar valores presumidos
+        para reconstruir uma configuração histórica.
+      properties:
+        schemaVersion:
+          type: integer
+          minimum: 1
+        controlProfileId:
+          type: string
+          maxLength: 120
+        profileSha256:
+          $ref: '#/components/schemas/Sha256'
+        greenTiming:
+          $ref: '#/components/schemas/GreenTiming'
+        blocking:
+          $ref: '#/components/schemas/BlockingParameters'
+        ppo:
+          $ref: '#/components/schemas/PpoParameters'
+        effectivePhaseTimings:
+          type: array
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/EffectivePhaseTiming'
+    ConfigurationWrite:
+      type: object
+      additionalProperties: false
+      required: [name, scenarioId, greenTiming, blocking]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        scenarioId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        greenTiming:
+          $ref: '#/components/schemas/GreenTiming'
+        blocking:
+          $ref: '#/components/schemas/BlockingParameters'
+        ppo:
+          $ref: '#/components/schemas/PpoParameters'
+    EffectivePhaseTiming:
+      type: object
+      additionalProperties: false
+      required: [signalControllerId, phaseIndex, nominalSeconds, requestedMinimumSeconds, effectiveMinimumSeconds, maximumSeconds]
+      properties:
+        signalControllerId:
+          type: string
+        phaseIndex:
+          type: integer
+          minimum: 0
+        nominalSeconds:
+          type: number
+          minimum: 0
+        requestedMinimumSeconds:
+          type: number
+        effectiveMinimumSeconds:
+          type: number
+          description: min(requestedMinimumSeconds, nominalSeconds) no perfil C2 atual.
+        maximumSeconds:
+          type: number
+    Configuration:
+      type: object
+      additionalProperties: false
+      required: [id, name, scenarioId, revision, greenTiming, effectivePhaseTimings, blocking, ppo, createdAtUtc, updatedAtUtc]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        scenarioId:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        greenTiming:
+          $ref: '#/components/schemas/GreenTiming'
+        effectivePhaseTimings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EffectivePhaseTiming'
+        blocking:
+          $ref: '#/components/schemas/BlockingParameters'
+        ppo:
+          $ref: '#/components/schemas/PpoParameters'
+        createdAtUtc:
+          type: string
+          format: date-time
+        updatedAtUtc:
+          type: string
+          format: date-time
+    RunType:
+      type: string
+      enum: [training, evaluation, diagnostic, replay]
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, interrupted]
+    RunOrigin:
+      type: string
+      enum: [apiWorker, imported]
+    EnvironmentKind:
+      type: string
+      enum: [simulation, replay]
+    RunRequest:
+      type: object
+      additionalProperties: false
+      required: [configurationId, runType, seed, horizonSeconds]
+      properties:
+        configurationId:
+          type: string
+          format: uuid
+        runType:
+          $ref: '#/components/schemas/RunType'
+        seed:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 2147483647
+        horizonSeconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        modelArtifactId:
+          type: string
+          maxLength: 120
+          description: Obrigatório para evaluation; selecionado do catálogo allowlisted.
+        comparisonRunId:
+          type: string
+          format: uuid
+          description: Baseline comparável do mesmo cenário; usada somente em avaliação.
+    RunProgress:
+      type: object
+      additionalProperties: false
+      required: [sequence, phase, completedTimesteps]
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+        phase:
+          type: string
+          enum: [starting, training, evaluating, collectingMetrics, finalizing]
+        episode:
+          type: integer
+          minimum: 0
+        completedTimesteps:
+          type: integer
+          minimum: 0
+        totalTimesteps:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          maxLength: 240
+          description: Texto informativo sem segredo, consulta ou caminho local.
+    RunFailure:
+      type: object
+      additionalProperties: false
+      required: [failureCode, message]
+      properties:
+        failureCode:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{1,63}$'
+        message:
+          type: string
+          maxLength: 500
+        logArtifactId:
+          type: string
+          maxLength: 120
+          description: Referência lógica previamente permitida; não é caminho do sistema.
+    MetricScope:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [network, signalController]
+        signalControllerId:
+          type: string
+          maxLength: 100
+          description: Obrigatório pela regra de domínio quando type=signalController.
+    MetricPoint:
+      type: object
+      additionalProperties: false
+      required: [metricName, value, unit, scope, sourceKey]
+      properties:
+        metricName:
+          type: string
+          pattern: '^[A-Za-z][A-Za-z0-9_.-]{0,127}$'
+        value:
+          type: number
+          description: Deve ser finito. Ausência de métrica não é zero.
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 40
+        scope:
+          $ref: '#/components/schemas/MetricScope'
+        episode:
+          type: integer
+          minimum: 1
+        step:
+          type: integer
+          minimum: 0
+        simulationTimeSeconds:
+          type: number
+          minimum: 0
+          description: Relógio SUMO, em segundos; não é horário UTC.
+        sourceKey:
+          type: string
+          minLength: 1
+          maxLength: 200
+    MetricCoverage:
+      type: object
+      additionalProperties: false
+      required: [expectedSamples, observedSamples, complete]
+      properties:
+        expectedSamples:
+          type: integer
+          minimum: 0
+        observedSamples:
+          type: integer
+          minimum: 0
+        complete:
+          type: boolean
+        note:
+          type: string
+          maxLength: 300
+    TrafficRunSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        departed:
+          type: integer
+          minimum: 0
+          description: Veículos inseridos na rede.
+        arrived:
+          type: integer
+          minimum: 0
+          description: Viagens concluídas segundo critério de proveniência registrado.
+        activeAtEnd:
+          type: integer
+          minimum: 0
+        duePendingAtEnd:
+          type: integer
+          minimum: 0
+        meanCompletedDurationSeconds:
+          type: number
+          minimum: 0
+        meanCompletedWaitingSeconds:
+          type: number
+          minimum: 0
+        collisionEventsConfirmed:
+          type: integer
+          minimum: 0
+          description: Eventos de collisions.xml, somente quando coletados e verificados.
+        collisionVehicleSteps:
+          type: integer
+          minimum: 0
+          description: Diagnóstico de passos veículo-em-colisão; não equivale a eventos.
+        teleportedVehicles:
+          type: integer
+          minimum: 0
+    ArtifactReference:
+      type: object
+      additionalProperties: false
+      required: [logicalName, sha256]
+      properties:
+        logicalName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sha256:
+          $ref: '#/components/schemas/Sha256'
+        sizeBytes:
+          type: integer
+          minimum: 0
+        contentType:
+          type: string
+          maxLength: 120
+    RunImport:
+      type: object
+      additionalProperties: false
+      required: [sourceRunId, scenarioId, runType, environment, seed, startedAtUtc, finishedAtUtc, horizonSeconds, scenarioFingerprint, trafficSummary, metrics, artifacts]
+      properties:
+        sourceRunId:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: ID lido do manifest ou da execução-fonte.
+        scenarioId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        runType:
+          type: string
+          enum: [training, evaluation, diagnostic, replay]
+        environment:
+          type: string
+          enum: [simulation, replay]
+        seed:
+          type: integer
+          format: int64
+          minimum: 0
+        startedAtUtc:
+          type: string
+          format: date-time
+        finishedAtUtc:
+          type: string
+          format: date-time
+        horizonSeconds:
+          type: number
+          minimum: 0
+        scenarioFingerprint:
+          type: object
+          additionalProperties: false
+          required: [networkSha256, catalogSha256, timingProfileSha256]
+          properties:
+            networkSha256:
+              $ref: '#/components/schemas/Sha256'
+            catalogSha256:
+              $ref: '#/components/schemas/Sha256'
+            routeDemandSha256:
+              $ref: '#/components/schemas/Sha256'
+            timingProfileSha256:
+              $ref: '#/components/schemas/Sha256'
+        model:
+          type: object
+          additionalProperties: false
+          required: [algorithm]
+          properties:
+            algorithm:
+              type: string
+              maxLength: 100
+            artifactId:
+              type: string
+              maxLength: 120
+            sha256:
+              $ref: '#/components/schemas/Sha256'
+        effectiveParameters:
+          $ref: '#/components/schemas/EffectiveRunParameters'
+        trafficSummary:
+          $ref: '#/components/schemas/TrafficRunSummary'
+        metrics:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: '#/components/schemas/MetricPoint'
+        coverage:
+          $ref: '#/components/schemas/MetricCoverage'
+        artifacts:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ArtifactReference'
+        limitations:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            maxLength: 500
+    RunArtifact:
+      type: object
+      additionalProperties: false
+      required: [id, logicalName, sha256]
+      properties:
+        id:
+          type: string
+          format: uuid
+        logicalName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sha256:
+          $ref: '#/components/schemas/Sha256'
+        sizeBytes:
+          type: integer
+          minimum: 0
+        contentType:
+          type: string
+          maxLength: 120
+    RunProgressView:
+      type: object
+      additionalProperties: false
+      required: [phase, updatedAtUtc]
+      properties:
+        phase:
+          type: string
+          enum: [queued, starting, training, evaluating, collectingMetrics, finalizing, succeeded, failed, interrupted]
+        episode:
+          type: integer
+        completedTimesteps:
+          type: integer
+        totalTimesteps:
+          type: integer
+        updatedAtUtc:
+          type: string
+          format: date-time
+    TrainingRun:
+      type: object
+      additionalProperties: false
+      required: [id, scenarioId, runType, origin, environment, status, seed, horizonSeconds, createdAtUtc, effectiveParameters]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceRunId:
+          type: string
+          maxLength: 200
+        scenarioId:
+          type: string
+        configurationId:
+          type: string
+          format: uuid
+        configurationRevision:
+          type: integer
+          minimum: 1
+        runType:
+          $ref: '#/components/schemas/RunType'
+        origin:
+          $ref: '#/components/schemas/RunOrigin'
+        environment:
+          $ref: '#/components/schemas/EnvironmentKind'
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        seed:
+          type: integer
+          format: int64
+          minimum: 0
+        horizonSeconds:
+          type: number
+          minimum: 0
+        scenarioFingerprint:
+          type: object
+          additionalProperties: false
+          required: [networkSha256, catalogSha256, timingProfileSha256]
+          properties:
+            networkSha256:
+              $ref: '#/components/schemas/Sha256'
+            catalogSha256:
+              $ref: '#/components/schemas/Sha256'
+            routeDemandSha256:
+              $ref: '#/components/schemas/Sha256'
+            timingProfileSha256:
+              $ref: '#/components/schemas/Sha256'
+        model:
+          type: object
+          additionalProperties: false
+          required: [algorithm]
+          properties:
+            algorithm:
+              type: string
+            artifactId:
+              type: string
+            sha256:
+              $ref: '#/components/schemas/Sha256'
+        effectiveParameters:
+          $ref: '#/components/schemas/EffectiveRunParameters'
+        progress:
+          $ref: '#/components/schemas/RunProgressView'
+        trafficSummary:
+          $ref: '#/components/schemas/TrafficRunSummary'
+        metricCoverage:
+          $ref: '#/components/schemas/MetricCoverage'
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunArtifact'
+        failure:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        createdAtUtc:
+          type: string
+          format: date-time
+        startedAtUtc:
+          type: string
+          format: date-time
+        finishedAtUtc:
+          type: string
+          format: date-time
+    RunPage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingRun'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    MetricPage:
+      type: object
+      additionalProperties: false
+      required: [items, coverage, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetricPoint'
+        coverage:
+          allOf:
+            - $ref: '#/components/schemas/MetricCoverage'
+          nullable: true
+          description: Cobertura da série temporal importada; null significa que a fonte não mediu cobertura.
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    SignalResult:
+      type: object
+      additionalProperties: false
+      required: [signalControllerId, metric, coverage]
+      properties:
+        signalControllerId:
+          type: string
+        metric:
+          $ref: '#/components/schemas/MetricPoint'
+        coverage:
+          $ref: '#/components/schemas/MetricCoverage'
+    SignalResultPage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignalResult'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    WorkerClaim:
+      type: object
+      additionalProperties: false
+      required: [claimId, run, leaseExpiresAtUtc]
+      properties:
+        claimId:
+          type: string
+          format: uuid
+        leaseExpiresAtUtc:
+          type: string
+          format: date-time
+        run:
+          $ref: '#/components/schemas/TrainingRun'
+        configurationSnapshot:
+          $ref: '#/components/schemas/Configuration'
+    RunCompletion:
+      type: object
+      additionalProperties: false
+      required: [sequence, completedAtUtc, trafficSummary, metrics, artifacts]
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+        completedAtUtc:
+          type: string
+          format: date-time
+        trafficSummary:
+          $ref: '#/components/schemas/TrafficRunSummary'
+        metrics:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: '#/components/schemas/MetricPoint'
+        coverage:
+          $ref: '#/components/schemas/MetricCoverage'
+        artifacts:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/ArtifactReference'
+    TrafficSummary:
+      type: object
+      additionalProperties: false
+      required: [scenarioId, environment, origin, asOfUtc, metrics, limitations]
+      properties:
+        scenarioId:
+          type: string
+        environment:
+          $ref: '#/components/schemas/EnvironmentKind'
+        origin:
+          type: string
+          enum: [imported, apiWorker]
+        asOfUtc:
+          type: string
+          format: date-time
+        simulationTimeSeconds:
+          type: number
+          minimum: 0
+        metrics:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/MetricPoint'
+        limitations:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+    CitizenReportWrite:
+      type: object
+      additionalProperties: false
+      required: [type, latitude, longitude]
+      properties:
+        type:
+          type: string
+          enum: [congestion, signalNotWorking, collision, roadObstruction, other]
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        description:
+          type: string
+          maxLength: 500
+        occurredAtUtc:
+          type: string
+          format: date-time
+    CitizenReport:
+      type: object
+      additionalProperties: false
+      required: [id, type, status, createdAtUtc]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [congestion, signalNotWorking, collision, roadObstruction, other]
+        status:
+          type: string
+          enum: [received, underReview, accepted, rejected]
+        createdAtUtc:
+          type: string
+          format: date-time
+        publicAreaLabel:
+          type: string
+          maxLength: 120
+          description: Localização generalizada; não expor a coordenada exata do autor.
+    Sha256:
+      type: string
+      pattern: '^[a-fA-F0-9]{64}$'
+

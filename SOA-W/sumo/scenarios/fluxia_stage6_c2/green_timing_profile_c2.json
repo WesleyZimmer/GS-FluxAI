@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "profile_id": "fluxia_stage6_simulation_control_v1",
+  "scope": "SUMO simulation experiments only; this is not a CET signal plan or a real-world safety setting.",
+  "green": {
+    "decision_minimum_s": 10.0,
+    "minimum_rule": "min(decision_minimum_s, imported SUMO nominal green duration for that phase)",
+    "maximum_s": 90.0,
+    "maximum_rule": "fixed simulation cap shared by all pilot phases; extension remains an explicit agent action",
+    "provenance": "FluxIA experiment guard selected to make early switch and extension actions testable while bounding each green; not calibrated against field data or CET plans."
+  },
+  "downstream_blocking": {
+    "observed_capacity_fraction_threshold": 0.95,
+    "blocked_confirmation_samples": 2,
+    "maximum_measurement_age_s": 6.0,
+    "single_full_sample_policy": "hold only while waiting for a second fresh confirming observation; if confirmation data becomes stale, follow the imported SUMO program",
+    "forecast_only_policy": "forecast risk never marks every destination blocked; if no destination is observed-open, release the lowest-risk observed destination after yellow and clearance rather than holding all-red on a forecast alone.",
+    "stale_or_incomplete_data_policy": "follow the imported SUMO program"
+  },
+  "yellow": {
+    "rule": "inherit exact phase and duration from the imported SUMO program; the agent cannot alter or skip it"
+  },
+  "red_clearance": {
+    "rule": "inherit exact all-red phase and duration; it may be extended only when all destinations are confirmed blocked by fresh repeated observed measurements"
+  },
+  "limitations": [
+    "The experiment profile enables the learning loop in simulation, but its green limits and storage threshold are uncalibrated hypotheses.",
+    "Per-controller CET safety-green, maximum-green, pedestrian and conflict settings remain unknown.",
+    "Storage capacity is currently an estimate, so a full observation is not a field-certified capacity value."
+  ]
+}

@@ -1,0 +1,44 @@
+# Entrega SOA&W: manter fora dados grandes e arquivos das demais frentes.
+/data/
+/qgis/
+/Trabalho/
+/requirements-ai*.txt
+/requirements-rl.txt
+
+# Scripts incluídos nesta entrega.
+/scripts/*
+!/scripts/fluxai_api_adapter.py
+
+# Apenas o cenário C2 usado pela API.
+/sumo/*
+!/sumo/scenarios/
+/sumo/scenarios/*
+!/sumo/scenarios/fluxia_stage6_c2/
+/sumo/scenarios/fluxia_stage6_c2/*
+!/sumo/scenarios/fluxia_stage6_c2/**
+
+# Documentação SOA&W e referências citadas pelo README.
+/docs/*
+!/docs/soa-w/
+/docs/soa-w/*
+!/docs/soa-w/**
+/docs/soa-w/plano-soa-w-fluxia.md
+!/docs/execucao-luna/
+/docs/execucao-luna/*
+!/docs/execucao-luna/contrato-telemetria.md
+!/docs/resultado-rl.md
+
+# Artefatos locais de build, banco e configuração por máquina.
+**/bin/
+**/obj/
+**/App_Data/
+*.db
+*.db-shm
+*.db-wal
+**/appsettings.Development.json
+.vs/
+.idea/
+/dist/
+.env
+.env.*
+!.env.example

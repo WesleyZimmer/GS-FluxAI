@@ -1,0 +1,364 @@
+{
+  "schema_version": 2,
+  "pilot_size": 8,
+  "network_file": "C:\\Users\\jonat\\OneDrive\\Área de Trabalho\\fiap\\gs2026.2\\sumo\\scenarios\\fluxia_stage6_c2\\centro_fluxia_c2.net.xml",
+  "network_sha256": "1b5247e19aff34a50c54280622153a2ee666071edb77c4a6a6b390a01f4b77d7",
+  "catalog_revision": "fluxia_stage6_c2",
+  "selection_rule": "Preserve the ordered controller IDs from the prior pilot catalog; refresh every phase index, state, duration, and coordinate from the C2 network.",
+  "projected_from_catalog": "C:\\Users\\jonat\\OneDrive\\Área de Trabalho\\fiap\\gs2026.2\\sumo\\pilot_signals.json",
+  "projected_from_catalog_sha256": "6bda1d498edbc95382f3d11b9abe372f917d71ef8a946a0b9fbc2cfc59d71998",
+  "source_full_catalog": "C:\\Users\\jonat\\OneDrive\\Área de Trabalho\\fiap\\gs2026.2\\sumo\\scenarios\\fluxia_stage6_c2\\pilot_signals_211_c2.json",
+  "source_full_catalog_sha256": "190e7eef92aa59888a4b66414b5882a5caf7785a1678e22e06d9d84133ead13e",
+  "adaptive_signal_count": 8,
+  "fixed_signal_count": 0,
+  "signals": [
+    {
+      "controller_id": "457026848",
+      "osm_id": "457026848",
+      "x": 2153.68,
+      "y": 2754.24,
+      "green_phase_indexes": [
+        0,
+        3
+      ],
+      "red_clearance_phase_indexes": [
+        2,
+        5
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGGrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyyrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "rrrGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rrryy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "627949654",
+      "osm_id": "627949654",
+      "x": 2205.57,
+      "y": 2680.86,
+      "green_phase_indexes": [
+        0,
+        3
+      ],
+      "red_clearance_phase_indexes": [
+        2,
+        5
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGGGGrrrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyyyyrrrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "rrrrrGGGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rrrrryyyy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "457026853",
+      "osm_id": "457026853",
+      "x": 2243.75,
+      "y": 2817.55,
+      "green_phase_indexes": [
+        0,
+        4
+      ],
+      "red_clearance_phase_indexes": [
+        3,
+        6
+      ],
+      "phases": [
+        {
+          "duration": 74.0,
+          "state": "GGrrGGGgg"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyrryyygg"
+        },
+        {
+          "duration": 5.0,
+          "state": "rrrrrrryy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrrrrr"
+        },
+        {
+          "duration": 6.0,
+          "state": "rrGGrrrGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rryyrrryy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "457026846",
+      "osm_id": "457026846",
+      "x": 2064.46,
+      "y": 2690.6,
+      "green_phase_indexes": [
+        0,
+        3
+      ],
+      "red_clearance_phase_indexes": [
+        2,
+        5
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGGrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyyrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "rrrGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rrryy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "457046458",
+      "osm_id": "457046458",
+      "x": 2086.25,
+      "y": 2844.79,
+      "green_phase_indexes": [
+        0,
+        3
+      ],
+      "red_clearance_phase_indexes": [
+        2,
+        5
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGrrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyrrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "rrGGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rryyy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "299350911",
+      "osm_id": "299350911",
+      "x": 2285.33,
+      "y": 2732.86,
+      "green_phase_indexes": [
+        0,
+        4
+      ],
+      "red_clearance_phase_indexes": [
+        3,
+        7
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGGGGrrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "GGyyyrrr"
+        },
+        {
+          "duration": 3.0,
+          "state": "yyrrrrrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "GGrrrGGg"
+        },
+        {
+          "duration": 5.0,
+          "state": "GGrrryyy"
+        },
+        {
+          "duration": 3.0,
+          "state": "yyrrrrrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "457046467",
+      "osm_id": "457046467",
+      "x": 2178.85,
+      "y": 2907.48,
+      "green_phase_indexes": [
+        0,
+        3
+      ],
+      "red_clearance_phase_indexes": [
+        2,
+        5
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGGrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyyrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "rrrGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rrryy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    },
+    {
+      "controller_id": "60685649",
+      "osm_id": "60685649",
+      "x": 2115.3,
+      "y": 2616.64,
+      "green_phase_indexes": [
+        0,
+        3
+      ],
+      "red_clearance_phase_indexes": [
+        2,
+        5
+      ],
+      "phases": [
+        {
+          "duration": 40.0,
+          "state": "GGGGrr"
+        },
+        {
+          "duration": 5.0,
+          "state": "yyyyrr"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrr"
+        },
+        {
+          "duration": 40.0,
+          "state": "rrrrGG"
+        },
+        {
+          "duration": 5.0,
+          "state": "rrrryy"
+        },
+        {
+          "duration": 1.0,
+          "state": "rrrrrr"
+        }
+      ],
+      "adaptive_control": true,
+      "control_note": null
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\sumo\scenarios\fluxia_stage6_c2\pilot_signals_8_c2.json" Link="SeedData\pilot_signals_8_c2.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\sumo\scenarios\fluxia_stage6_c2\green_timing_profile_c2.json" Link="SeedData\green_timing_profile_c2.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
