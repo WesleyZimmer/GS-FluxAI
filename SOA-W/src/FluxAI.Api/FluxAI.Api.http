@@ -1,0 +1,44 @@
+@FluxAI.Api_HostAddress = http://localhost:5169
+@ApiBase = {{FluxAI.Api_HostAddress}}/api/v1
+@ScenarioId = fluxia-stage6-c2-8-signals
+@SignalControllerId = 457026848
+@RunId = 746ac962-28c9-43d2-ba46-79240b2cf044
+@OperatorToken = replace-with-operator-token
+@WorkerToken = replace-with-worker-token
+
+### Health check
+GET {{FluxAI.Api_HostAddress}}/healthz
+Accept: application/json
+
+### T01 — List scenarios
+GET {{ApiBase}}/scenarios?pageSize=20
+Accept: application/json
+
+### T01 — List C2 signal controllers
+GET {{ApiBase}}/signal-controllers?scenarioId={{ScenarioId}}&pageSize=20
+Accept: application/json
+
+### Read the seeded demo configuration
+GET {{ApiBase}}/configurations/d90f8532-b77e-4b9d-9d4d-0b5851b6a0c2
+Accept: application/json
+Authorization: Bearer {{OperatorToken}}
+
+### List imported runs
+GET {{ApiBase}}/runs?scenarioId={{ScenarioId}}&status=succeeded&pageSize=20
+Accept: application/json
+Authorization: Bearer {{OperatorToken}}
+
+### Read the known imported replay
+GET {{ApiBase}}/runs/{{RunId}}
+Accept: application/json
+Authorization: Bearer {{OperatorToken}}
+
+### T10 — Read a page of queue metrics
+GET {{ApiBase}}/runs/{{RunId}}/metrics?metricName=queue.vehicles&scope=signalController&signalControllerId={{SignalControllerId}}&pageSize=3
+Accept: application/json
+Authorization: Bearer {{OperatorToken}}
+
+### T10 — Read aggregate signal results
+GET {{ApiBase}}/runs/{{RunId}}/signal-results?pageSize=100
+Accept: application/json
+Authorization: Bearer {{OperatorToken}}
