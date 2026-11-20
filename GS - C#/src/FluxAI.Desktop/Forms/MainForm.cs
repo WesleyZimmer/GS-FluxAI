@@ -559,12 +559,7 @@ internal sealed class MainForm : Form
         scenarioGroup.Controls.Add(scenarioGrid);
         steps.TabPages.Add(CreateSetupStep("1  Cenário", scenarioGroup));
 
-        var ppoStep = new TabPage("2  Algoritmo")
-        {
-            BackColor = FluxAiTheme.Canvas,
-            Padding = Padding.Empty,
-            AutoScroll = true
-        };
+        var ppoStep = new TabPage("2  Algoritmo") { BackColor = FluxAiTheme.Canvas, Padding = Padding.Empty };
         ppoStep.Controls.Add(BuildPpoStep());
         steps.TabPages.Add(ppoStep);
 
@@ -635,18 +630,16 @@ internal sealed class MainForm : Form
     {
         var layout = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            RowCount = 3,
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2,
             Padding = new Padding(18, 14, 18, 12),
             BackColor = FluxAiTheme.Canvas
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 47));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 53));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var intro = new TableLayoutPanel
         {
@@ -674,6 +667,7 @@ internal sealed class MainForm : Form
             Margin = Padding.Empty
         }, 0, 1);
         layout.Controls.Add(intro, 0, 0);
+        layout.SetColumnSpan(intro, 2);
 
         layout.Controls.Add(CreateSetupSectionCard(
             "Dados de treinamento",
@@ -683,7 +677,7 @@ internal sealed class MainForm : Form
                 ("Salvar checkpoint a cada", _checkpointEvery, "Intervalo para salvar o modelo; 0 desativa os checkpoints."),
                 ("Passos por rollout", _rolloutSteps, "Experi\u00eancias coletadas antes de atualizar o agente."),
                 ("Tamanho do batch", _batchSize, "Amostras processadas juntas em cada atualiza\u00e7\u00e3o.")
-            ]));
+            ]), 0, 1);
         layout.Controls.Add(CreateSetupSectionCard(
             "Hiperpar\u00e2metros PPO",
             "Ritmo, estabilidade e exploração do agente.",
@@ -694,7 +688,7 @@ internal sealed class MainForm : Form
                 ("GAE lambda", _gaeLambda, "Suaviza a estimativa de vantagem das a\u00e7\u00f5es."),
                 ("Clip range", _clipRange, "Evita mudan\u00e7as grandes na estrat\u00e9gia por atualiza\u00e7\u00e3o."),
                 ("Coeficiente de entropia", _entropy, "Valor maior incentiva testar a\u00e7\u00f5es variadas.")
-            ]));
+            ]), 1, 1);
 
         return layout;
     }
@@ -702,14 +696,13 @@ internal sealed class MainForm : Form
     private Control CreateSetupSectionCard(
         string title,
         string description,
-        IReadOnlyList<(string Label, NumericUpDown Input, string Help)> fields)
+        IReadOnlyList<(string Label, NumericUpDown Input, string Help)> fields,
+        int fieldColumns = 2)
     {
         var card = new Panel
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Margin = new Padding(4, 0, 4, 14),
+            Dock = DockStyle.Fill,
+            Margin = new Padding(4, 0, 10, 4),
             Padding = new Padding(14),
             BackColor = FluxAiTheme.Surface,
             BorderStyle = BorderStyle.FixedSingle
@@ -742,24 +735,27 @@ internal sealed class MainForm : Form
             Margin = new Padding(0, 0, 0, 8)
         }, 0, 1);
 
+        var fieldRows = (fields.Count + fieldColumns - 1) / fieldColumns;
         var fieldList = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            RowCount = fields.Count,
+            AutoSize = false,
+            ColumnCount = fieldColumns,
+            RowCount = fieldRows,
             BackColor = FluxAiTheme.Surface,
             Margin = Padding.Empty
         };
-        fieldList.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        for (var column = 0; column < fieldColumns; column++)
+            fieldList.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / fieldColumns));
         for (var index = 0; index < fields.Count; index++)
         {
-            fieldList.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            if (index % fieldColumns == 0)
+                fieldList.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / fieldRows));
             var field = BuildSetupField(fields[index].Label, fields[index].Input, fields[index].Help);
             _setupToolTip.SetToolTip(fields[index].Input, fields[index].Help);
-            fieldList.Controls.Add(field, 0, index);
+            fieldList.Controls.Add(field, index % fieldColumns, index / fieldColumns);
         }
+        fieldList.Height = fieldRows * 98;
         content.Controls.Add(fieldList, 0, 2);
         card.Controls.Add(content);
         return card;
@@ -768,83 +764,51 @@ internal sealed class MainForm : Form
     private Control BuildSetupField(string label, NumericUpDown input, string help)
     {
         input.Visible = false;
-        input.AccessibleName = label;
-        input.AccessibleDescription = help;
-
-        var card = new Panel
-        {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Margin = new Padding(0, 0, 0, 8),
-            Padding = new Padding(12, 10, 12, 11),
-            BackColor = Color.FromArgb(248, 251, 252)
-        };
-        card.Paint += (_, e) =>
-        {
-            using var pen = new Pen(FluxAiTheme.Border);
-            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
-            using var accent = new SolidBrush(Color.FromArgb(183, 216, 218));
-            e.Graphics.FillRectangle(accent, 0, 1, 3, card.Height - 2);
-        };
-
         var field = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 3,
-            Margin = Padding.Empty,
-            BackColor = card.BackColor
+            Margin = new Padding(4, 2, 8, 3),
+            BackColor = FluxAiTheme.Surface
         };
-        field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         field.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        field.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        field.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        field.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        field.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var fieldLabel = new Label
         {
             Text = label,
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold),
+            Tag = "field-label",
+            Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold),
             ForeColor = FluxAiTheme.Ink,
-            Margin = new Padding(0, 0, 0, 3)
+            Margin = new Padding(0, 0, 0, 4)
         };
         field.Controls.Add(fieldLabel, 0, 0);
         var helpLabel = new Label
         {
             Text = help,
             AutoSize = true,
-            MaximumSize = new Size(760, 0),
+            MaximumSize = new Size(220, 0),
             Tag = "muted",
-            Font = new Font("Segoe UI", 9F),
+            Font = new Font("Segoe UI", 8.25F),
             ForeColor = FluxAiTheme.Muted,
-            Margin = new Padding(0, 0, 0, 1)
-        };
-        var selectorRow = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 48,
-            Margin = new Padding(0, 9, 0, 0),
-            BackColor = card.BackColor
+            Margin = new Padding(0, 4, 0, 0)
         };
         var stepper = BuildPpoNumberStepper(input, help, helpLabel);
-        stepper.Dock = DockStyle.Left;
-        selectorRow.Controls.Add(stepper);
-        field.Controls.Add(helpLabel, 0, 1);
-        field.Controls.Add(selectorRow, 0, 2);
-        card.Controls.Add(field);
+        field.Controls.Add(stepper, 0, 1);
+        field.Controls.Add(helpLabel, 0, 2);
         _setupToolTip.SetToolTip(stepper, help);
-        return card;
+        return field;
     }
 
     private static Control BuildPpoNumberStepper(NumericUpDown valueModel, string help, Label helpLabel)
     {
         var shell = new Panel
         {
-            Width = 272,
-            Height = 48,
-            Padding = new Padding(4),
+            Dock = DockStyle.Fill,
+            Height = 42,
+            Padding = new Padding(3),
             BackColor = Color.White,
             BorderStyle = BorderStyle.None,
             Margin = Padding.Empty,
@@ -859,14 +823,14 @@ internal sealed class MainForm : Form
             BackColor = Color.White,
             Margin = Padding.Empty
         };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 32));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 32));
         row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var decrement = new Button
         {
-            Text = "\u2212",
+            Text = "-",
             Dock = DockStyle.Fill,
             FlatStyle = FlatStyle.Flat,
             Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold),
@@ -883,11 +847,11 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.None,
-            TextAlign = HorizontalAlignment.Center,
-            Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold),
+            TextAlign = HorizontalAlignment.Right,
+            Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold),
             ForeColor = FluxAiTheme.Ink,
             BackColor = Color.White,
-            Margin = new Padding(8, 3, 8, 3),
+            Margin = new Padding(8, 5, 8, 3),
             Tag = "ppo-number-editor",
             AccessibleName = valueModel.AccessibleName,
             AccessibleDescription = help
@@ -908,18 +872,15 @@ internal sealed class MainForm : Form
         increment.FlatAppearance.BorderSize = 0;
         increment.FlatAppearance.MouseOverBackColor = Color.FromArgb(211, 237, 234);
 
-        var hasError = false;
-
         void RefreshFromModel()
         {
             if (!editor.Focused)
                 editor.Text = valueModel.Text;
             decrement.Enabled = valueModel.Enabled && valueModel.Value > valueModel.Minimum;
             increment.Enabled = valueModel.Enabled && valueModel.Value < valueModel.Maximum;
-            hasError = false;
+            helpLabel.MaximumSize = new Size(Math.Max(132, shell.Width), 0);
             helpLabel.Text = help;
             helpLabel.ForeColor = FluxAiTheme.Muted;
-            shell.Invalidate();
         }
         void CommitEditor()
         {
@@ -928,24 +889,19 @@ internal sealed class MainForm : Form
             if (parsed && value >= valueModel.Minimum && value <= valueModel.Maximum)
             {
                 valueModel.Value = value;
-                hasError = false;
                 helpLabel.Text = help;
                 helpLabel.ForeColor = FluxAiTheme.Muted;
-                editor.Text = valueModel.Text;
             }
             else
             {
                 helpLabel.Text = $"Digite um valor entre {valueModel.Minimum} e {valueModel.Maximum}.";
                 helpLabel.ForeColor = Color.FromArgb(179, 57, 64);
-                hasError = true;
             }
-            shell.Invalidate();
         }
         void ChangeBy(decimal direction)
         {
             var next = valueModel.Value + (valueModel.Increment * direction);
             valueModel.Value = Math.Clamp(next, valueModel.Minimum, valueModel.Maximum);
-            editor.Text = valueModel.Text;
         }
 
         decrement.Click += (_, _) => ChangeBy(-1);
@@ -977,14 +933,13 @@ internal sealed class MainForm : Form
         };
         shell.Paint += (_, e) =>
         {
-            var color = hasError
-                ? Color.FromArgb(179, 57, 64)
-                : editor.Focused ? FluxAiTheme.Brand : Color.FromArgb(190, 207, 211);
-            using var pen = new Pen(color, editor.Focused || hasError ? 2F : 1F);
-            e.Graphics.DrawRectangle(pen, 1, 1, shell.Width - 3, shell.Height - 3);
+            var color = editor.Focused ? FluxAiTheme.Brand : Color.FromArgb(207, 218, 222);
+            using var pen = new Pen(color, editor.Focused ? 2F : 1F);
+            e.Graphics.DrawRectangle(pen, 0, 0, shell.Width - 1, shell.Height - 1);
         };
         editor.Enter += (_, _) => shell.Invalidate();
         editor.Leave += (_, _) => shell.Invalidate();
+        shell.SizeChanged += (_, _) => helpLabel.MaximumSize = new Size(Math.Max(132, shell.Width), 0);
         RefreshFromModel();
 
         row.Controls.Add(decrement, 0, 0);
